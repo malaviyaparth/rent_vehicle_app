@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/car_service.dart';
 import '../widgets/car_list_item.dart';
+import 'add_edit_car_screen.dart';
+import 'car_details_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -24,14 +26,24 @@ class HomeScreen extends StatelessWidget {
           return CarListItem(
             car: car,
             onTap: () {
-              // Details screen will be added in the next step
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CarDetailsScreen(carId: car.id),
+                ),
+              );
             },
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Add car screen will be added in a later step
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AddEditCarScreen(),
+            ),
+          );
         },
         child: const Icon(Icons.add),
       ),
