@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import '../services/car_service.dart';
 import '../widgets/car_list_item.dart';
 import 'car_details_screen.dart';
@@ -30,6 +31,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Welcome!'),
+
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () => context.read<AuthService>().logout(),
+          ),
+        ],
       ),
       body: Column(
         children: [

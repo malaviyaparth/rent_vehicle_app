@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:rent_vehicle/screens/auth_gate.dart';
+import 'package:rent_vehicle/services/auth_service.dart';
 import 'firebase_options.dart';
 import 'services/car_service.dart';
 import 'screens/home_screen.dart';
@@ -18,8 +20,11 @@ class CarRentalApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => CarService(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => CarService()),
+      ],
       child: MaterialApp(
         title: 'Car Rental App',
         debugShowCheckedModeBanner: false,
@@ -27,7 +32,7 @@ class CarRentalApp extends StatelessWidget {
           colorSchemeSeed: Colors.indigo,
           useMaterial3: true,
         ),
-        home: const HomeScreen(),
+        home: const AuthGate(),
       ),
     );
   }
