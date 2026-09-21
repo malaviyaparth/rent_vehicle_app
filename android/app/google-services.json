@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "86302124785",
+    "project_id": "rentvehicle-dee5d",
+    "storage_bucket": "rentvehicle-dee5d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:86302124785:android:b03cae8ba830beefb65750",
+        "android_client_info": {
+          "package_name": "com.example.rent_vehicle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBU8ZLF8pnxSRJR_WdwTyw1tCEvKwTm5mE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
