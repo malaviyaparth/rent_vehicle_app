@@ -5,6 +5,8 @@ import '../services/auth_service.dart';
 import '../widgets/car_list_item.dart';
 import 'car_details_screen.dart';
 import 'add_edit_car_screen.dart';
+import 'my_rental_history_screen.dart';
+import 'owner_rental_history_screen.dart';
 
 enum CarFilter { all, available, rented, myCars }
 
@@ -37,6 +39,27 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('All Cars'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'My Rental History',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyRentalHistoryScreen()),
+              );
+            },
+          ),
+          if (isOwner)
+            IconButton(
+              icon: const Icon(Icons.receipt_long),
+              tooltip: 'Rental History (My Cars)',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OwnerRentalHistoryScreen()),
+                );
+              },
+            ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
             onPressed: () => context.read<AuthService>().logout(),
@@ -66,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: Text('Rented'),
                     icon: Icon(Icons.block),
                   ),
+                  // Only owners see "My Cars".
                   if (isOwner)
                     const ButtonSegment(
                       value: CarFilter.myCars,
@@ -107,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      // Only owners can list a car for rent.
       floatingActionButton: isOwner
           ? FloatingActionButton(
         onPressed: () {

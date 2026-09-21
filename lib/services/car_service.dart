@@ -1,18 +1,16 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 import '../models/car.dart';
 
-/// Acts as our in-memory "backend" for cars.
-/// Later this can be swapped with real API calls without
-/// changing how screens use it.
+/// Firestore-backed car "backend".
+/// Listens to the `cars` collection in real time and exposes it the same
+/// way the old in-memory version did, so screens barely had to change.
 class CarService extends ChangeNotifier {
   final CollectionReference<Map<String, dynamic>> _carsRef =
-      FirebaseFirestore.instance.collection('cars');
+  FirebaseFirestore.instance.collection('cars');
 
-  late List<Car> _cars = [];
+  List<Car> _cars = [];
   bool _loading = true;
   StreamSubscription? _subscription;
 
@@ -38,11 +36,14 @@ class CarService extends ChangeNotifier {
 
   List<Car> get rentedCars => _cars.where((c) => !c.available).toList();
 
+  /// Cars belonging to a specific owner (used for the "My Cars" section).
   List<Car> carsByOwner(String ownerId) =>
       _cars.where((c) => c.ownerId == ownerId).toList();
 
   Car getById(String id) => _cars.firstWhere((c) => c.id == id);
 
+  /// Returns true if the plate already exists on another car.
+  /// Pass [excludeId] when editing a car, so it can keep its own plate.
   Future<bool> isPlateTaken(String plate, {String? excludeId}) async {
     final normalized = plate.trim().toUpperCase();
     final query = await _carsRef.where('licensePlate', isEqualTo: normalized).get();
@@ -50,7 +51,23 @@ class CarService extends ChangeNotifier {
   }
 
   Future<void> addCar(Car car) async {
-    await _carsRef.add(car.toMap());
+    final docRef = await _carsRef.add(car.toMap());
+
+    final addedCar = Car(
+      id: docRef.id,
+      ownerId: car.ownerId,
+      licensePlate: car.licensePlate,
+      brand: car.brand,
+      model: car.model,
+      year: car.year,
+      pricePerDay: car.pricePerDay,
+      description: car.description,
+      available: car.available,
+    );
+    if (!_cars.any((c) => c.id == addedCar.id)) {
+      _cars = [..._cars, addedCar];
+      notifyListeners();
+    }
   }
 
   Future<void> updateCar(Car updatedCar) async {

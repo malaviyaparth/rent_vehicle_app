@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:rent_vehicle/screens/auth_gate.dart';
-import 'package:rent_vehicle/services/auth_service.dart';
 import 'firebase_options.dart';
 import 'services/car_service.dart';
-import 'screens/home_screen.dart';
+import 'services/auth_service.dart';
+import 'services/rental_service.dart';
+import 'screens/auth_gate.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -24,6 +24,7 @@ class CarRentalApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => CarService()),
+        ChangeNotifierProvider(create: (_) => RentalService()),
       ],
       child: MaterialApp(
         title: 'Car Rental App',

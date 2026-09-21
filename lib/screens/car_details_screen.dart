@@ -4,6 +4,7 @@ import '../models/car.dart';
 import '../services/car_service.dart';
 import '../services/auth_service.dart';
 import 'add_edit_car_screen.dart';
+import '../widgets/rent_car_dialog.dart';
 
 class CarDetailsScreen extends StatelessWidget {
   final String carId;
@@ -64,6 +65,8 @@ class CarDetailsScreen extends StatelessWidget {
       );
     }
 
+    // Only the owner of THIS specific car can manage it — an owner
+    // cannot edit/delete/toggle another owner's car.
     final isOwnerOfThisCar = car.ownerId == currentUser.uid;
 
     return Scaffold(
@@ -97,6 +100,7 @@ class CarDetailsScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           if (isOwnerOfThisCar) ...[
+            // OWNER-ONLY: manage their own car
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -140,11 +144,11 @@ class CarDetailsScreen extends StatelessWidget {
               label: const Text('Remove Car'),
             ),
           ] else ...[
+            // ANYONE ELSE (a "user", or an owner viewing someone else's car):
+            // rent-for-N-days flow will be wired up in the next step.
             ElevatedButton.icon(
               onPressed: car.available
-                  ? () {
-                // Rent duration flow — next step.
-              }
+                  ? () => showRentCarDialog(context, car!)
                   : null,
               icon: const Icon(Icons.shopping_cart_checkout),
               label: Text(car.available ? 'Rent This Car' : 'Currently Unavailable'),
