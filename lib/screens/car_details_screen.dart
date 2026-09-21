@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/car.dart';
 import '../services/car_service.dart';
+import '../services/auth_service.dart';
 import 'add_edit_car_screen.dart';
 
 class CarDetailsScreen extends StatelessWidget {
@@ -33,19 +34,22 @@ class CarDetailsScreen extends StatelessWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      context.read<CarService>().removeCar(car.id);
-      Navigator.pop(context); // back to home screen
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${car.brand} ${car.model} removed.')),
-      );
+      await context.read<CarService>().removeCar(car.id);
+      if (context.mounted) {
+        Navigator.pop(context); // back to home screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${car.brand} ${car.model} removed.')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final carService = context.watch<CarService>();
+    final authService = context.watch<AuthService>();
+    final currentUser = authService.currentUser!;
 
-    // If the car was deleted while this screen is open, pop back safely.
     Car? car;
     try {
       car = carService.getById(carId);
@@ -59,6 +63,8 @@ class CarDetailsScreen extends StatelessWidget {
         body: const Center(child: Text('This car no longer exists.')),
       );
     }
+
+    final isOwnerOfThisCar = car.ownerId == currentUser.uid;
 
     return Scaffold(
       appBar: AppBar(
@@ -89,47 +95,64 @@ class CarDetailsScreen extends StatelessWidget {
             style: const TextStyle(fontSize: 15),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AddEditCarScreen(car: car),
-                ),
-              );
-            },
-            icon: const Icon(Icons.edit),
-            label: const Text('Edit Car'),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: car.available ? Colors.orange : Colors.green,
-            ),
-            onPressed: () {
-              context.read<CarService>().toggleAvailability(car!.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    car.available
-                        ? '${car.brand} ${car.model} marked as rented.'
-                        : '${car.brand} ${car.model} marked as available.',
+
+          if (isOwnerOfThisCar) ...[
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddEditCarScreen(car: car),
                   ),
-                ),
-              );
-            },
-            icon: Icon(car.available ? Icons.key : Icons.key_off),
-            label: Text(car.available ? 'Mark as Rented' : 'Mark as Available'),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              _confirmDelete(context, car!);
-            },
-            icon: const Icon(Icons.delete),
-            label: const Text('Remove Car'),
-          ),
+                );
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Car'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: car.available ? Colors.orange : Colors.green,
+              ),
+              onPressed: () async {
+                final wasAvailable = car!.available;
+                await context.read<CarService>().toggleAvailability(car.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        wasAvailable
+                            ? '${car!.brand} ${car.model} marked as rented.'
+                            : '${car!.brand} ${car.model} marked as available.',
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: Icon(car.available ? Icons.key : Icons.key_off),
+              label: Text(car.available ? 'Mark as Rented' : 'Mark as Available'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => _confirmDelete(context, car!),
+              icon: const Icon(Icons.delete),
+              label: const Text('Remove Car'),
+            ),
+          ] else ...[
+            ElevatedButton.icon(
+              onPressed: car.available
+                  ? () {
+                // Rent duration flow — next step.
+              }
+                  : null,
+              icon: const Icon(Icons.shopping_cart_checkout),
+              label: Text(car.available ? 'Rent This Car' : 'Currently Unavailable'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ],
         ],
       ),
     );

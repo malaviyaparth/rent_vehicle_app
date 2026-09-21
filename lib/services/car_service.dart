@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/car.dart';
@@ -6,40 +9,28 @@ import '../models/car.dart';
 /// Later this can be swapped with real API calls without
 /// changing how screens use it.
 class CarService extends ChangeNotifier {
-  final _uuid = const Uuid();
+  final CollectionReference<Map<String, dynamic>> _carsRef =
+      FirebaseFirestore.instance.collection('cars');
 
-  final List<Car> _cars = [
-    Car(
-      id: const Uuid().v4(),
-      licensePlate: 'GJ06AB1234',
-      brand: 'Toyota',
-      model: 'Corolla',
-      year: 2021,
-      pricePerDay: 35.0,
-      description: 'Fuel-efficient sedan, great for city driving.',
-      available: true,
-    ),
-    Car(
-      id: const Uuid().v4(),
-      licensePlate: 'GJ06CD5678',
-      brand: 'Honda',
-      model: 'Civic',
-      year: 2022,
-      pricePerDay: 40.0,
-      description: 'Comfortable and reliable compact car.',
-      available: false,
-    ),
-    Car(
-      id: const Uuid().v4(),
-      licensePlate: 'GJ06EF9012',
-      brand: 'Ford',
-      model: 'Mustang',
-      year: 2023,
-      pricePerDay: 90.0,
-      description: 'Sporty muscle car, weekend favorite.',
-      available: true,
-    ),
-  ];
+  late List<Car> _cars = [];
+  bool _loading = true;
+  StreamSubscription? _subscription;
+
+  CarService() {
+    _subscription = _carsRef.snapshots().listen((snapshot) {
+      _cars = snapshot.docs.map((doc) => Car.fromMap(doc.id, doc.data())).toList();
+      _loading = false;
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  bool get isLoading => _loading;
 
   List<Car> get cars => List.unmodifiable(_cars);
 
@@ -47,42 +38,31 @@ class CarService extends ChangeNotifier {
 
   List<Car> get rentedCars => _cars.where((c) => !c.available).toList();
 
+  List<Car> carsByOwner(String ownerId) =>
+      _cars.where((c) => c.ownerId == ownerId).toList();
+
   Car getById(String id) => _cars.firstWhere((c) => c.id == id);
 
-  /// Returns true if the plate already exists on another car.
-  /// Pass [excludeId] when editing a car, so it can keep its own plate.
-  bool isPlateTaken(String plate, {String? excludeId}) {
+  Future<bool> isPlateTaken(String plate, {String? excludeId}) async {
     final normalized = plate.trim().toUpperCase();
-    return _cars.any(
-          (c) => c.licensePlate.toUpperCase() == normalized && c.id != excludeId,
-    );
+    final query = await _carsRef.where('licensePlate', isEqualTo: normalized).get();
+    return query.docs.any((doc) => doc.id != excludeId);
   }
 
-  void addCar(Car car) {
-    _cars.add(car);
-    notifyListeners();
+  Future<void> addCar(Car car) async {
+    await _carsRef.add(car.toMap());
   }
 
-  void updateCar(Car updatedCar) {
-    final index = _cars.indexWhere((c) => c.id == updatedCar.id);
-    if (index != -1) {
-      _cars[index] = updatedCar;
-      notifyListeners();
-    }
+  Future<void> updateCar(Car updatedCar) async {
+    await _carsRef.doc(updatedCar.id).update(updatedCar.toMap());
   }
 
-  void toggleAvailability(String id) {
-    final index = _cars.indexWhere((c) => c.id == id);
-    if (index != -1) {
-      _cars[index] = _cars[index].copyWith(available: !_cars[index].available);
-      notifyListeners();
-    }
+  Future<void> toggleAvailability(String id) async {
+    final car = getById(id);
+    await _carsRef.doc(id).update({'available': !car.available});
   }
 
-  void removeCar(String id) {
-    _cars.removeWhere((c) => c.id == id);
-    notifyListeners();
+  Future<void> removeCar(String id) async {
+    await _carsRef.doc(id).delete();
   }
-
-  String newId() => _uuid.v4();
 }
