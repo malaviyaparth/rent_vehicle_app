@@ -133,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       // Only owners can list a car for rent.
       floatingActionButton: isOwner
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
             context,
@@ -142,7 +142,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: Text("Add vehicle"),
       )
           : null,
     );
