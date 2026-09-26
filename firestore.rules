@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    // ── Users Collection ──
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+
+      allow create: if isOwner(userId) 
+                    && (!request.resource.data.keys().hasAny(['role']) 
+                        || request.resource.data.role in ['user', 'owner']);
+
+      allow update: if (isOwner(userId) 
+                        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) 
+                            || isAdmin()))
+                    || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Vehicles / Cars Collection ──
+    match /cars/{carId} {
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated();
+
+      // Owner or Admin can update full vehicle details;
+      // Any authenticated borrower can update availability when booking or returning
+      allow update: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['available', 'updatedAt'])
+      );
+
+      allow delete: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    // ── Rentals / Bookings Collection ──
+    match /rentals/{rentalId} {
+      // Borrowers, Owners, and Admins can read
+      allow read: if isAuthenticated();
+
+      // Authenticated users can create bookings
+      allow create: if isAuthenticated() 
+                    && request.resource.data.userId == request.auth.uid;
+
+      // Borrowers can cancel; owners can accept/reject/complete; admins can manage all
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Payments Collection ──
+    match /payments/{paymentId} {
+      // Users can read their own payment records, Admins can read all
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Authenticated users can create their own payment records
+      allow create: if isAuthenticated() 
+                    && request.resource.data.userId == request.auth.uid;
+
+      // Only admins or payment creators can update, admins can delete
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+  }
+}

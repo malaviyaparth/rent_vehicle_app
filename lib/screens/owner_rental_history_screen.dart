@@ -16,7 +16,6 @@ class OwnerRentalHistoryScreen extends StatelessWidget {
 
     final rentals = rentalService.rentalsByOwner(currentUser.uid);
 
-    // Group rentals by carId, preserving most-recent-first order within each group.
     final Map<String, List<RentalRecord>> grouped = {};
     for (final rental in rentals) {
       grouped.putIfAbsent(rental.carId, () => []).add(rental);
@@ -25,36 +24,46 @@ class OwnerRentalHistoryScreen extends StatelessWidget {
     final carIds = grouped.keys.toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Rental History (My Cars)')),
+      appBar: AppBar(title: const Text('Rental Bookings (My Vehicles)')),
       body: rentalService.isLoading
           ? const Center(child: CircularProgressIndicator())
           : rentals.isEmpty
-          ? const Center(child: Text('None of your cars have been rented yet.'))
-          : ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: carIds.length,
-        itemBuilder: (context, index) {
-          final carId = carIds[index];
-          final carRentals = grouped[carId]!;
-          final sample = carRentals.first;
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'None of your vehicles have any bookings yet.',
+                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: carIds.length,
+                  itemBuilder: (context, index) {
+                    final carId = carIds[index];
+                    final carRentals = grouped[carId]!;
+                    final sample = carRentals.first;
 
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            child: ExpansionTile(
-              title: Text(
-                '${sample.carBrand} ${sample.carModel}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(
-                '${sample.licensePlate} • ${carRentals.length} rental(s)',
-              ),
-              children: carRentals
-                  .map((rental) => _RenterTile(rental: rental))
-                  .toList(),
-            ),
-          );
-        },
-      ),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: ExpansionTile(
+                        initiallyExpanded: index == 0,
+                        leading: const Icon(Icons.directions_car, color: Colors.indigo),
+                        title: Text(
+                          '${sample.carBrand} ${sample.carModel}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${sample.licensePlate} • ${carRentals.length} booking(s)',
+                        ),
+                        children: carRentals
+                            .map((rental) => _RenterTile(rental: rental))
+                            .toList(),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
@@ -67,32 +76,80 @@ class _RenterTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, yyyy');
+    final rentalService = context.read<RentalService>();
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: rental.isActive ? Colors.green : Colors.grey,
-        child: const Icon(Icons.person, color: Colors.white, size: 20),
+    Color statusColor = Colors.grey;
+    if (rental.isConfirmed) statusColor = Colors.green;
+    if (rental.isPending) statusColor = Colors.orange;
+    if (rental.isCancelled) statusColor = Colors.red;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
-      title: Text(rental.userName.isEmpty ? 'Unknown user' : rental.userName),
-      subtitle: Text(
-        '${dateFormat.format(rental.startDate)} → ${dateFormat.format(rental.endDate)} '
-            '(${rental.days} day(s))',
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '\$${rental.totalPrice.toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 18, color: Colors.indigo),
+                  const SizedBox(width: 6),
+                  Text(
+                    rental.userName.isEmpty ? 'Customer' : rental.userName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  rental.status.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 6),
           Text(
-            rental.isActive ? 'Active' : 'Completed',
-            style: TextStyle(
-              fontSize: 11,
-              color: rental.isActive ? Colors.green.shade700 : Colors.grey.shade600,
+            '${dateFormat.format(rental.startDate)} → ${dateFormat.format(rental.endDate)} '
+            '(${rental.days} days)',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Total Earned: ₹${rental.totalPrice.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.indigo),
+          ),
+          if (rental.isPending) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => rentalService.rejectRental(rental.id, rental.carId),
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Reject'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () => rentalService.acceptRental(rental.id),
+                  child: const Text('Accept Booking'),
+                ),
+              ],
             ),
-          ),
+          ],
         ],
       ),
     );

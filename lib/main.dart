@@ -5,6 +5,8 @@ import 'firebase_options.dart';
 import 'services/car_service.dart';
 import 'services/auth_service.dart';
 import 'services/rental_service.dart';
+import 'services/location_service.dart';
+import 'services/payment_service.dart';
 import 'screens/auth_gate.dart';
 
 void main() async {
@@ -25,6 +27,8 @@ class CarRentalApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => CarService()),
         ChangeNotifierProvider(create: (_) => RentalService()),
+        ChangeNotifierProvider(create: (_) => LocationService()),
+        ChangeNotifierProvider(create: (_) => PaymentService()),
       ],
       child: MaterialApp(
         title: 'Car Rental App',

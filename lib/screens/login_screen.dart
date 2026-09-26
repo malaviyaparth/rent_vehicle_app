@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../utils/validators.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -70,8 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'Email',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) =>
-                  (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
+                  validator: Validators.validateEmail,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
