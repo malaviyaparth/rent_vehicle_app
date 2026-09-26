@@ -31,8 +31,17 @@
   <link rel="icon" type="image/png" href="favicon.png" />
 
   <title>rent_vehicle</title>
-  <!-- Google Maps JavaScript API -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPtRku1HjUBSa8KDWDq490aQv1gZxkp6s"></script>
+  <!-- Google Maps JavaScript API (Configured dynamically to prevent exposing keys) -->
+  <script>
+    (function() {
+      var apiKey = window.GOOGLE_MAPS_API_KEY || "";
+      if (apiKey && apiKey !== "YOUR_GOOGLE_MAPS_API_KEY") {
+        var s = document.createElement("script");
+        s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(apiKey);
+        document.head.appendChild(s);
+      }
+    })();
+  </script>
 </head>
 
 <body>

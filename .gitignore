@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Environment and Secret files
+.env
+.env.*
+*.env
+!.env.example
+!*.example
+local.properties
+**/local.properties
+
