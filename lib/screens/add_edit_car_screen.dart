@@ -194,6 +194,14 @@ class _AddEditCarScreenState extends State<AddEditCarScreen> {
       setState(() {
         _pickupLocation = result;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green.shade800,
+          content: Text(
+            'Pickup location registered: ${result['latitude']!.toStringAsFixed(4)}, ${result['longitude']!.toStringAsFixed(4)}',
+          ),
+        ),
+      );
     }
   }
 
