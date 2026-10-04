@@ -24,6 +24,10 @@ class RentalRecord {
   DateTime startDate;
   DateTime endDate;
   String status;
+  bool hasRated;
+  double? rating;
+  String? reviewComment;
+  DateTime? ratedAt;
   DateTime? createdAt;
   DateTime? updatedAt;
 
@@ -44,6 +48,10 @@ class RentalRecord {
     required this.startDate,
     required this.endDate,
     required this.status,
+    this.hasRated = false,
+    this.rating,
+    this.reviewComment,
+    this.ratedAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -87,6 +95,10 @@ class RentalRecord {
           ? (data['endDate'] as Timestamp).toDate()
           : (DateTime.tryParse(data['endDate']?.toString() ?? '') ?? DateTime.now()),
       status: data['status'] ?? 'confirmed',
+      hasRated: data['hasRated'] == true,
+      rating: (data['rating'] as num?)?.toDouble(),
+      reviewComment: data['comment'] ?? data['reviewComment'],
+      ratedAt: parseDate(data['ratedAt']),
       createdAt: parseDate(data['createdAt']),
       updatedAt: parseDate(data['updatedAt']),
     );
@@ -109,11 +121,15 @@ class RentalRecord {
       'startDate': Timestamp.fromDate(startDate),
       'endDate': Timestamp.fromDate(endDate),
       'status': status,
+      'hasRated': hasRated,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
     if (userEmail != null) map['userEmail'] = userEmail;
     if (userPhone != null) map['userPhone'] = userPhone;
+    if (rating != null) map['rating'] = rating;
+    if (reviewComment != null) map['comment'] = reviewComment;
+    if (ratedAt != null) map['ratedAt'] = Timestamp.fromDate(ratedAt!);
     return map;
   }
 }

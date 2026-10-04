@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/car.dart';
+import '../models/review.dart';
 import '../services/car_service.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import '../services/map_service.dart';
 import '../services/rental_service.dart';
+import '../services/review_service.dart';
 import '../utils/distance_utils.dart';
 import 'add_edit_car_screen.dart';
 import '../widgets/rent_car_dialog.dart';
@@ -216,6 +218,58 @@ class CarDetailsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 6),
+                      if (car.hasRatings)
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.star_rounded, size: 16, color: Color(0xFFD97706)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    car.averageRating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: Color(0xFF92400E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${car.totalRatings} ${car.totalRatings == 1 ? 'Review' : 'Reviews'}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Row(
+                          children: [
+                            Icon(Icons.star_outline_rounded, size: 16, color: Colors.grey.shade400),
+                            const SizedBox(width: 4),
+                            Text(
+                              'No ratings yet',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -508,6 +562,11 @@ class CarDetailsScreen extends StatelessWidget {
             ),
           ),
 
+          const SizedBox(height: 14),
+
+          // ── Ratings & Reviews Section (Visible to anyone before renting) ──
+          _buildRatingsAndReviewsSection(context, car),
+
           const SizedBox(height: 20),
 
           // ── Owner / Admin Action Buttons ──
@@ -529,29 +588,62 @@ class CarDetailsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: car.available ? const Color(0xFFD97706) : const Color(0xFF059669),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: () async {
-                final wasAvailable = car!.available;
-                await context.read<CarService>().toggleAvailability(car.id);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        wasAvailable
-                            ? '${car!.brand} ${car.model} marked as inactive.'
-                            : '${car!.brand} ${car.model} marked as available.',
+            Builder(builder: (context) {
+              if (isRentedRightNow) {
+                return ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF94A3B8),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Cannot toggle availability: Vehicle is currently on an active trip with a renter.'),
                       ),
-                    ),
-                  );
-                }
-              },
-              icon: Icon(car.available ? Icons.pause_circle_outline : Icons.play_circle_outline),
-              label: Text(car.available ? 'Mark as Inactive' : 'Mark as Available'),
-            ),
+                    );
+                  },
+                  icon: const Icon(Icons.lock_clock),
+                  label: const Text('Currently Rented (Availability Locked)'),
+                );
+              }
+
+              final currentCar = car!;
+              final isAvailable = currentCar.available;
+              return ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isAvailable ? const Color(0xFFD97706) : const Color(0xFF059669),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () async {
+                  try {
+                    await context.read<CarService>().toggleAvailability(currentCar.id);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: isAvailable ? const Color(0xFFD97706) : const Color(0xFF059669),
+                          content: Text(
+                            isAvailable
+                                ? '${currentCar.brand} ${currentCar.model} marked as Inactive.'
+                                : '${currentCar.brand} ${currentCar.model} marked as Available.',
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: Colors.red,
+                          content: Text('Failed to update status: $e'),
+                        ),
+                      );
+                    }
+                  }
+                },
+                icon: Icon(isAvailable ? Icons.pause_circle_outline : Icons.play_circle_outline),
+                label: Text(isAvailable ? 'Mark as Inactive' : 'Mark as Available'),
+              );
+            }),
             const SizedBox(height: 10),
             Builder(builder: (context) {
               final isCarRented = isRentedRightNow || upcomingBookings.isNotEmpty;
@@ -776,6 +868,265 @@ class CarDetailsScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ratings and customer reviews section that any prospective renter can inspect before booking.
+  Widget _buildRatingsAndReviewsSection(BuildContext context, Car car) {
+    final reviewService = context.watch<ReviewService>();
+    final dateFormat = DateFormat('MMM d, yyyy');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Title
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Ratings & Reviews',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              if (car.hasRatings)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '⭐ ${car.averageRating.toStringAsFixed(1)} (${car.totalRatings})',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Real-time Reviews Stream
+          StreamBuilder<List<Review>>(
+            stream: reviewService.getReviewsForCar(car.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+
+              final reviews = snapshot.data ?? [];
+
+              if (reviews.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.rate_review_outlined, size: 36, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'No ratings yet',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Be the first to complete a trip and leave a review for this vehicle!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final double avgScore = reviews.isNotEmpty
+                  ? (reviews.map((r) => r.rating).reduce((a, b) => a + b) / reviews.length)
+                  : car.averageRating;
+              final int totalReviewsCount = reviews.isNotEmpty ? reviews.length : car.totalRatings;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Overall Rating Score Header
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          avgScore.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: List.generate(5, (index) {
+                                final starVal = index + 1;
+                                final isFull = avgScore >= starVal;
+                                final isHalf = avgScore >= (starVal - 0.5) && !isFull;
+                                return Icon(
+                                  isFull
+                                      ? Icons.star_rounded
+                                      : isHalf
+                                          ? Icons.star_half_rounded
+                                          : Icons.star_outline_rounded,
+                                  size: 18,
+                                  color: const Color(0xFFF59E0B),
+                                );
+                              }),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Based on $totalReviewsCount verified ${totalReviewsCount == 1 ? 'review' : 'reviews'}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Reviews List (Newest first)
+                  ...reviews.map((r) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                child: Text(
+                                  r.userName.isNotEmpty ? r.userName[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2563EB),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r.userName,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    Text(
+                                      dateFormat.format(r.createdAt),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: List.generate(5, (index) {
+                                  return Icon(
+                                    index < r.rating
+                                        ? Icons.star_rounded
+                                        : Icons.star_outline_rounded,
+                                    size: 16,
+                                    color: index < r.rating
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFFCBD5E1),
+                                  );
+                                }),
+                              ),
+                            ],
+                          ),
+                          if (r.comment.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              r.comment,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              );
+            },
           ),
         ],
       ),

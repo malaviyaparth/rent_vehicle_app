@@ -7,6 +7,7 @@ import 'services/auth_service.dart';
 import 'services/rental_service.dart';
 import 'services/location_service.dart';
 import 'services/payment_service.dart';
+import 'services/review_service.dart';
 import 'screens/auth_gate.dart';
 
 void main() async {
@@ -29,6 +30,7 @@ class CarRentalApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RentalService()),
         ChangeNotifierProvider(create: (_) => LocationService()),
         ChangeNotifierProvider(create: (_) => PaymentService()),
+        ChangeNotifierProvider(create: (_) => ReviewService()),
       ],
       child: MaterialApp(
         title: 'Car Rental App',

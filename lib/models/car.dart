@@ -27,7 +27,12 @@ class Car {
   Map<String, double>? pickupLocation;
 
   /// Optional list of image URLs.
+  /// Optional list of image URLs.
   List<String> imageUrls;
+
+  /// Rating summary (default 0.0, 0 total ratings for new vehicles)
+  double averageRating;
+  int totalRatings;
 
   DateTime? createdAt;
   DateTime? updatedAt;
@@ -47,6 +52,8 @@ class Car {
     this.fuelType = 'Petrol',
     this.pickupLocation,
     this.imageUrls = const [],
+    this.averageRating = 0.0,
+    this.totalRatings = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -62,6 +69,14 @@ class Car {
   /// User-friendly category subtitle (e.g., 'SUV • Diesel' or 'Bike • Petrol').
   String get typeAndFuel => '$vehicleSubType • $fuelType';
 
+  /// Whether vehicle has at least one rating
+  bool get hasRatings => totalRatings > 0;
+
+  /// User-friendly rating summary string
+  String get ratingText => hasRatings
+      ? '${averageRating.toStringAsFixed(1)} ($totalRatings ${totalRatings == 1 ? 'review' : 'reviews'})'
+      : 'No ratings yet';
+
   Car copyWith({
     String? licensePlate,
     String? brand,
@@ -75,6 +90,8 @@ class Car {
     String? fuelType,
     Map<String, double>? Function()? pickupLocation,
     List<String>? imageUrls,
+    double? averageRating,
+    int? totalRatings,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -93,6 +110,8 @@ class Car {
       fuelType: fuelType ?? this.fuelType,
       pickupLocation: pickupLocation != null ? pickupLocation() : this.pickupLocation,
       imageUrls: imageUrls ?? this.imageUrls,
+      averageRating: averageRating ?? this.averageRating,
+      totalRatings: totalRatings ?? this.totalRatings,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -155,6 +174,8 @@ class Car {
       fuelType: data['fuelType'] ?? 'Petrol',
       pickupLocation: pickup,
       imageUrls: images,
+      averageRating: (data['averageRating'] as num?)?.toDouble() ?? 0.0,
+      totalRatings: (data['totalRatings'] as num?)?.toInt() ?? 0,
       createdAt: parseDate(data['createdAt']),
       updatedAt: parseDate(data['updatedAt']),
     );
@@ -175,6 +196,8 @@ class Car {
       'fuelType': fuelType,
       'pickupLocation': pickupLocation,
       'imageUrls': imageUrls,
+      'averageRating': averageRating,
+      'totalRatings': totalRatings,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };

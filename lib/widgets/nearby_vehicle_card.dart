@@ -120,6 +120,48 @@ class NearbyVehicleCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+
+                  // Rating row
+                  if (car.hasRatings)
+                    Row(
+                      children: [
+                        const Icon(Icons.star_rounded, size: 15, color: Color(0xFFD97706)),
+                        const SizedBox(width: 3),
+                        Text(
+                          car.averageRating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '(${car.totalRatings} ${car.totalRatings == 1 ? 'review' : 'reviews'})',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      children: [
+                        Icon(Icons.star_outline_rounded, size: 14, color: Colors.grey.shade400),
+                        const SizedBox(width: 3),
+                        Text(
+                          'No ratings yet',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 6),
 
                   // ── Row 2: Sub-Type + Fuel chips ──

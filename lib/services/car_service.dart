@@ -99,18 +99,51 @@ class CarService extends ChangeNotifier {
   }
 
   Future<void> toggleAvailability(String id) async {
-    final car = getById(id);
-    await _carsRef.doc(id).update({
-      'available': !car.available,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final index = _cars.indexWhere((c) => c.id == id);
+    if (index == -1) {
+      throw Exception('Vehicle not found.');
+    }
+    final car = _cars[index];
+    final newAvailability = !car.available;
+
+    // Optimistically update local list so UI reacts immediately
+    _cars[index] = car.copyWith(available: newAvailability);
+    notifyListeners();
+
+    try {
+      await _carsRef.doc(id).update({
+        'available': newAvailability,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // Revert if Firestore operation fails
+      _cars[index] = car;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> setAvailability(String id, bool available) async {
-    await _carsRef.doc(id).update({
-      'available': available,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final index = _cars.indexWhere((c) => c.id == id);
+    Car? oldCar;
+    if (index != -1) {
+      oldCar = _cars[index];
+      _cars[index] = oldCar.copyWith(available: available);
+      notifyListeners();
+    }
+
+    try {
+      await _carsRef.doc(id).update({
+        'available': available,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      if (index != -1 && oldCar != null) {
+        _cars[index] = oldCar;
+        notifyListeners();
+      }
+      rethrow;
+    }
   }
 
   Future<void> removeCar(String id) async {

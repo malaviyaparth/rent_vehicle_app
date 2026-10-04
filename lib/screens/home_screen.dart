@@ -14,7 +14,7 @@ import 'nearby_vehicles_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'profile_screen.dart';
 
-enum CarFilter { all, available, rented }
+enum CarFilter { all, available, rented, inactive }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -85,10 +85,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Car> baseCars = switch (_selectedFilter) {
       CarFilter.all => poolOfCars,
       CarFilter.available => poolOfCars.where((c) => c.available && !rentedIds.contains(c.id)).toList(),
-      CarFilter.rented => poolOfCars.where((c) => !c.available || rentedIds.contains(c.id)).toList(),
+      CarFilter.rented => poolOfCars.where((c) => rentedIds.contains(c.id)).toList(),
+      CarFilter.inactive => poolOfCars.where((c) => !c.available && !rentedIds.contains(c.id)).toList(),
     };
     final List<Car> cars = baseCars.map((c) {
-      final isRented = !c.available || rentedIds.contains(c.id);
+      final isRented = rentedIds.contains(c.id);
       return isRented && c.available ? c.copyWith(available: false) : c;
     }).toList();
 
@@ -196,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const Color(0xFFEFF6FF),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: _buildMetricTile(
                           'Available',
@@ -205,13 +206,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           const Color(0xFFECFDF5),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: _buildMetricTile(
                           'Rented',
-                          '${poolOfCars.where((c) => !c.available || rentedIds.contains(c.id)).length}',
+                          '${poolOfCars.where((c) => rentedIds.contains(c.id)).length}',
                           const Color(0xFFE11D48),
                           const Color(0xFFFFF1F2),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: _buildMetricTile(
+                          'Inactive',
+                          '${poolOfCars.where((c) => !c.available && !rentedIds.contains(c.id)).length}',
+                          const Color(0xFFD97706),
+                          const Color(0xFFFFFBEB),
                         ),
                       ),
                     ],
@@ -321,22 +331,28 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SizedBox(
               width: double.infinity,
               child: SegmentedButton<CarFilter>(
-                segments: const [
-                  ButtonSegment(
+                segments: [
+                  const ButtonSegment(
                     value: CarFilter.all,
                     label: Text('All'),
                     icon: Icon(Icons.grid_view, size: 16),
                   ),
-                  ButtonSegment(
+                  const ButtonSegment(
                     value: CarFilter.available,
                     label: Text('Available'),
                     icon: Icon(Icons.check_circle_outline, size: 16),
                   ),
-                  ButtonSegment(
+                  const ButtonSegment(
                     value: CarFilter.rented,
                     label: Text('Rented'),
                     icon: Icon(Icons.lock_clock, size: 16),
                   ),
+                  if (isOwner)
+                    const ButtonSegment(
+                      value: CarFilter.inactive,
+                      label: Text('Inactive'),
+                      icon: Icon(Icons.pause_circle_outline, size: 16),
+                    ),
                 ],
                 selected: {_selectedFilter},
                 onSelectionChanged: (newSelection) {
@@ -395,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemCount: cars.length,
                         itemBuilder: (context, index) {
                           final car = cars[index];
-                          final isRented = !car.available || rentedIds.contains(car.id);
+                          final isRented = rentedIds.contains(car.id);
                           final isCarOwner = isOwner && car.ownerId == currentUser.uid;
                           final activeRental = (isCarOwner && (isRented || _selectedFilter == CarFilter.rented))
                               ? rentalService.activeRentalForCar(car.id)
@@ -406,6 +422,37 @@ class _HomeScreenState extends State<HomeScreen> {
                             activeRental: activeRental,
                             showBorrowerDetails: isCarOwner,
                             distanceKm: carDistances[car.id],
+                            onToggleAvailability: isCarOwner
+                                ? () async {
+                                    try {
+                                      final wasAvailable = car.available;
+                                      await carService.toggleAvailability(car.id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: wasAvailable
+                                                ? const Color(0xFFD97706)
+                                                : const Color(0xFF059669),
+                                            content: Text(
+                                              wasAvailable
+                                                  ? '${car.brand} ${car.model} marked as Inactive.'
+                                                  : '${car.brand} ${car.model} marked as Available.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            backgroundColor: Colors.red,
+                                            content: Text('Failed to update status: $e'),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                : null,
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -484,6 +531,8 @@ class _HomeScreenState extends State<HomeScreen> {
           return 'All of your listed vehicles are currently booked or inactive.';
         case CarFilter.rented:
           return 'None of your listed vehicles are rented right now.';
+        case CarFilter.inactive:
+          return 'None of your listed vehicles are marked inactive.';
       }
     }
     if (hasLocation) {
@@ -494,6 +543,8 @@ class _HomeScreenState extends State<HomeScreen> {
           return 'No available vehicles found within 50 km.';
         case CarFilter.rented:
           return 'No currently rented vehicles within 50 km.';
+        case CarFilter.inactive:
+          return 'No inactive vehicles.';
       }
     }
     switch (_selectedFilter) {
@@ -503,6 +554,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'No vehicles are currently available.';
       case CarFilter.rented:
         return 'No vehicles are currently rented.';
+      case CarFilter.inactive:
+        return 'No inactive vehicles.';
     }
   }
 }

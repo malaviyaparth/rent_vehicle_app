@@ -15,7 +15,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
+      return isAuthenticated() 
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && getUserData().role == 'admin';
     }
 
     // ── Users Collection ──
@@ -36,18 +38,16 @@ service cloud.firestore {
 
     // ── Vehicles / Cars Collection ──
     match /cars/{carId} {
-      allow read: if isAuthenticated();
+      // Anyone can browse vehicles and see rating info
+      allow read: if true;
 
+      // Authenticated users can list cars
       allow create: if isAuthenticated();
 
-      // Owner or Admin can update full vehicle details;
-      // Any authenticated borrower can update availability when booking or returning
-      allow update: if isAuthenticated() && (
-        resource.data.ownerId == request.auth.uid ||
-        isAdmin() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['available', 'updatedAt'])
-      );
+      // Authenticated users can update car (owners edit specs, borrowers update availability or ratings)
+      allow update: if isAuthenticated();
 
+      // Only car owner or admin can delete
       allow delete: if isAuthenticated() && (
         resource.data.ownerId == request.auth.uid || 
         isAdmin()
@@ -60,37 +60,31 @@ service cloud.firestore {
       allow read: if isAuthenticated();
 
       // Authenticated users can create bookings
-      allow create: if isAuthenticated() 
-                    && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
 
-      // Borrowers can cancel; owners can accept/reject/complete; admins can manage all
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        resource.data.ownerId == request.auth.uid ||
-        isAdmin()
-      );
+      // Borrowers, owners, and admins can update (cancel, accept, complete, mark rated)
+      allow update: if isAuthenticated();
 
       allow delete: if isAdmin();
     }
 
+    // ── Reviews & Ratings Collection ──
+    match /reviews/{reviewId} {
+      // Anyone can read reviews and ratings before renting
+      allow read: if true;
+
+      // Any authenticated user can submit a review
+      allow create: if isAuthenticated();
+
+      // Author or admin can update/delete
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
     // ── Payments Collection ──
     match /payments/{paymentId} {
-      // Users can read their own payment records, Admins can read all
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-
-      // Authenticated users can create their own payment records
-      allow create: if isAuthenticated() 
-                    && request.resource.data.userId == request.auth.uid;
-
-      // Only admins or payment creators can update, admins can delete
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
-
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
   }

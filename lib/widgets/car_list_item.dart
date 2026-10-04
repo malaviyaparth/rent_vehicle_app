@@ -10,6 +10,7 @@ class CarListItem extends StatelessWidget {
   final bool showBorrowerDetails;
   final double? distanceKm;
   final VoidCallback onTap;
+  final VoidCallback? onToggleAvailability;
 
   const CarListItem({
     super.key,
@@ -18,14 +19,21 @@ class CarListItem extends StatelessWidget {
     this.showBorrowerDetails = false,
     this.distanceKm,
     required this.onTap,
+    this.onToggleAvailability,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isAvailable = car.available;
+    final isRented = activeRental != null;
+    final isInactive = !car.available && !isRented;
+    final isAvailable = car.available && !isRented;
     final hasBorrower = showBorrowerDetails && activeRental != null;
     final isTwoWheeler = car.vehicleType.toLowerCase().contains('two') ||
         car.vehicleType.toLowerCase().contains('bike');
+
+    final Color borderColor = isAvailable
+        ? const Color(0xFFE2E8F0)
+        : (isInactive ? const Color(0xFFFDE68A) : const Color(0xFFFECDD3));
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -34,7 +42,7 @@ class CarListItem extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isAvailable ? const Color(0xFFE2E8F0) : const Color(0xFFFECDD3),
+          color: borderColor,
           width: 1.2,
         ),
       ),
@@ -56,7 +64,12 @@ class CarListItem extends StatelessWidget {
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) =>
-                        _buildFallbackBanner(isTwoWheeler, isAvailable),
+                        _buildFallbackBanner(
+                          isTwoWheeler,
+                          isAvailable: isAvailable,
+                          isInactive: isInactive,
+                          isRented: isRented,
+                        ),
                   ),
                   Positioned.fill(
                     child: DecoratedBox(
@@ -95,12 +108,21 @@ class CarListItem extends StatelessWidget {
                   Positioned(
                     top: 10,
                     right: 10,
-                    child: _buildStatusPill(isAvailable),
+                    child: _buildStatusPill(
+                      isAvailable: isAvailable,
+                      isInactive: isInactive,
+                      isRented: isRented,
+                    ),
                   ),
                 ],
               )
             else
-              _buildFallbackBanner(isTwoWheeler, isAvailable),
+              _buildFallbackBanner(
+                isTwoWheeler,
+                isAvailable: isAvailable,
+                isInactive: isInactive,
+                isRented: isRented,
+              ),
 
             // ── Main Details Section ──
             Padding(
@@ -134,6 +156,46 @@ class CarListItem extends StatelessWidget {
                                 color: Color(0xFF64748B),
                               ),
                             ),
+                            const SizedBox(height: 4),
+                            if (car.hasRatings)
+                              Row(
+                                children: [
+                                  const Icon(Icons.star_rounded, size: 16, color: Color(0xFFD97706)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    car.averageRating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '(${car.totalRatings} ${car.totalRatings == 1 ? 'review' : 'reviews'})',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              Row(
+                                children: [
+                                  Icon(Icons.star_outline_rounded, size: 14, color: Colors.grey.shade400),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'No ratings yet',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -307,25 +369,115 @@ class CarListItem extends StatelessWidget {
                       ),
                     ),
                   ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildFallbackBanner(bool isTwoWheeler, bool isAvailable) {
+                // ── Owner Quick Availability Toggle Row ──
+                if (showBorrowerDetails && onToggleAvailability != null) ...[
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isRented
+                                ? Icons.lock_clock
+                                : (isInactive
+                                    ? Icons.pause_circle_filled
+                                    : Icons.check_circle),
+                            size: 16,
+                            color: isRented
+                                ? const Color(0xFFE11D48)
+                                : (isInactive
+                                    ? const Color(0xFFD97706)
+                                    : const Color(0xFF059669)),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isRented
+                                ? 'Currently Rented'
+                                : (isInactive
+                                    ? 'Status: Inactive'
+                                    : 'Status: Available'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isRented
+                                  ? const Color(0xFFE11D48)
+                                  : (isInactive
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFF059669)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!isRented)
+                        OutlinedButton.icon(
+                          onPressed: onToggleAvailability,
+                          icon: Icon(
+                            isInactive
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                            size: 15,
+                            color: isInactive
+                                ? const Color(0xFF059669)
+                                : const Color(0xFFD97706),
+                          ),
+                          label: Text(
+                            isInactive ? 'Mark Available' : 'Mark Inactive',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isInactive
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFFD97706),
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            side: BorderSide(
+                              color: isInactive
+                                  ? const Color(0xFF6EE7B7)
+                                  : const Color(0xFFFCD34D),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildFallbackBanner(
+    bool isTwoWheeler, {
+    required bool isAvailable,
+    required bool isInactive,
+    required bool isRented,
+  }) {
+    List<Color> gradientColors;
+    if (isRented) {
+      gradientColors = [const Color(0xFF4C0519), const Color(0xFF881337)];
+    } else if (isInactive) {
+      gradientColors = [const Color(0xFF451A03), const Color(0xFF78350F)];
+    } else {
+      gradientColors = [const Color(0xFF1E293B), const Color(0xFF334155)];
+    }
+
     return Container(
       height: 90,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isAvailable
-              ? [const Color(0xFF1E293B), const Color(0xFF334155)]
-              : [const Color(0xFF4C0519), const Color(0xFF881337)],
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -368,21 +520,53 @@ class CarListItem extends StatelessWidget {
               ],
             ),
           ),
-          _buildStatusPill(isAvailable),
+          _buildStatusPill(
+            isAvailable: isAvailable,
+            isInactive: isInactive,
+            isRented: isRented,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusPill(bool isAvailable) {
+  Widget _buildStatusPill({
+    required bool isAvailable,
+    required bool isInactive,
+    required bool isRented,
+  }) {
+    Color bg;
+    Color border;
+    Color dot;
+    Color text;
+    String label;
+
+    if (isRented) {
+      bg = const Color(0xFFFFF1F2);
+      border = const Color(0xFFFDA4AF);
+      dot = const Color(0xFFE11D48);
+      text = const Color(0xFF9F1239);
+      label = 'RENTED';
+    } else if (isInactive) {
+      bg = const Color(0xFFFFFBEB);
+      border = const Color(0xFFFDE68A);
+      dot = const Color(0xFFD97706);
+      text = const Color(0xFF92400E);
+      label = 'INACTIVE';
+    } else {
+      bg = const Color(0xFFECFDF5);
+      border = const Color(0xFF6EE7B7);
+      dot = const Color(0xFF059669);
+      text = const Color(0xFF065F46);
+      label = 'AVAILABLE';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isAvailable ? const Color(0xFFECFDF5) : const Color(0xFFFFF1F2),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isAvailable ? const Color(0xFF6EE7B7) : const Color(0xFFFDA4AF),
-        ),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -399,16 +583,16 @@ class CarListItem extends StatelessWidget {
             height: 7,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isAvailable ? const Color(0xFF059669) : const Color(0xFFE11D48),
+              color: dot,
             ),
           ),
           const SizedBox(width: 5),
           Text(
-            isAvailable ? 'AVAILABLE' : 'RENTED',
+            label,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: isAvailable ? const Color(0xFF065F46) : const Color(0xFF9F1239),
+              color: text,
               letterSpacing: 0.4,
             ),
           ),
